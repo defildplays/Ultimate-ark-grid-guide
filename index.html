@@ -425,11 +425,60 @@ html,body{overflow-x:hidden}
   }
 }
 </style>
+
+<style id="imdefild-field-guide-geometry-restore">
+/* Preserve the original Field Guide geometry; JS only moves it vertically. */
+@media (min-width:761px){
+  .chapter-layout .guide-nav{
+    position:relative!important;
+    top:auto!important;
+    left:auto!important;
+    right:auto!important;
+    bottom:auto!important;
+    width:auto!important;
+    max-width:none!important;
+    max-height:none!important;
+    margin:0!important;
+    align-self:start!important;
+    overflow:visible!important;
+    overscroll-behavior:auto!important;
+    scrollbar-width:auto!important;
+    z-index:55!important;
+    will-change:transform;
+  }
+  .chapter-layout main{grid-column:2!important;min-width:0!important}
+  .chapter-layout .guide-nav nav a.scroll-active,
+  .chapter-layout .guide-nav nav a[aria-current="page"]{
+    color:#f5dcaa!important;
+    background:linear-gradient(90deg,rgba(209,161,74,.17),rgba(73,90,116,.09))!important;
+    border-color:transparent!important;
+    box-shadow:inset 0 0 0 1px rgba(218,178,102,.16)!important;
+  }
+  .chapter-layout .guide-nav nav a.scroll-active:before,
+  .chapter-layout .guide-nav nav a[aria-current="page"]:before{
+    content:""!important;
+    display:block!important;
+    position:absolute!important;
+    left:0!important;
+    top:8px!important;
+    bottom:8px!important;
+    width:2px!important;
+    border-radius:2px!important;
+    background:var(--site-gold)!important;
+    box-shadow:0 0 12px rgba(242,200,111,.35)!important;
+  }
+  .chapter-layout .guide-nav nav a.scroll-active span,
+  .chapter-layout .guide-nav nav a[aria-current="page"] span{color:#d7b66f!important}
+}
+@media (max-width:760px){
+  .chapter-layout .guide-nav{transform:none!important}
+}
+</style>
+
 </head><body><div id="root"></div>
 <script id="imdefild-polish-runtime">
 (function(){
-  var tries=0;
-  var cleanup=null;
+  var tries=0, cleanup=null, translateCss=0;
 
   function boot(){
     var layout=document.querySelector('.chapter-layout');
@@ -437,7 +486,7 @@ html,body{overflow-x:hidden}
     var main=layout && layout.querySelector('main');
     var links=nav ? Array.from(nav.querySelectorAll('a[href^="#"]')) : [];
     var sections=links.map(function(a){
-      var href=a.getAttribute('href') || '';
+      var href=a.getAttribute('href')||'';
       if(!href || href.charAt(0)!=='#') return null;
       try{return document.querySelector(href)}catch(e){return null}
     }).filter(Boolean);
@@ -447,8 +496,12 @@ html,body{overflow-x:hidden}
       if(tries<120) setTimeout(boot,100);
       return;
     }
-
     if(cleanup) cleanup();
+
+    /* Remove geometry left behind by older fixed-sidebar versions. */
+    ['left','top','width','max-height','position','overflow-y'].forEach(function(p){nav.style.removeProperty(p)});
+    nav.style.transform='none';
+    translateCss=0;
 
     var progress=document.getElementById('site-scroll-progress');
     if(!progress){
@@ -474,64 +527,55 @@ html,body{overflow-x:hidden}
     function desktop(){return window.matchMedia('(min-width:761px)').matches}
     function zoomValue(){
       var z=parseFloat(getComputedStyle(document.body).zoom);
-      return Number.isFinite(z) && z>0 ? z : 1;
+      return Number.isFinite(z)&&z>0 ? z : 1;
     }
 
-    function alignGuide(){
+    function followGuide(){
       if(!desktop()){
-        nav.style.removeProperty('left');
-        nav.style.removeProperty('top');
-        nav.style.removeProperty('width');
-        nav.style.removeProperty('max-height');
+        translateCss=0;
+        nav.style.transform='none';
         return;
       }
       var z=zoomValue();
-      var rect=layout.getBoundingClientRect();
-      var cs=getComputedStyle(layout);
-      var cols=cs.gridTemplateColumns.trim().split(/\s+/);
-      var first=parseFloat(cols[0]);
-      if(!Number.isFinite(first) || first<=0) first=nav.offsetWidth || 218;
+      var rect=nav.getBoundingClientRect();
+      /* Remove our existing transform from the measured viewport position. */
+      var baseTop=rect.top-(translateCss*z);
       var header=document.querySelector('.topbar');
       var headerBottom=header ? header.getBoundingClientRect().bottom : 0;
-      var topPhysical=Math.max(headerBottom+22,82);
+      /* Matches the original desktop sticky offset while respecting the fixed header. */
+      var desiredTop=Math.max(88*z,headerBottom+18);
+      var next=Math.max(0,(desiredTop-baseTop)/z);
 
-      nav.style.setProperty('left',(rect.left/z)+'px','important');
-      nav.style.setProperty('top',(topPhysical/z)+'px','important');
-      nav.style.setProperty('width',first+'px','important');
-      nav.style.setProperty('max-height',(Math.max(300,window.innerHeight-topPhysical-20)/z)+'px','important');
+      /* Do not let the rail move beyond the bottom of the guide layout. */
+      var layoutRect=layout.getBoundingClientRect();
+      var navHeight=rect.height;
+      var maxPhysical=(layoutRect.bottom-baseTop)-navHeight-18;
+      if(Number.isFinite(maxPhysical)) next=Math.min(next,Math.max(0,maxPhysical/z));
+
+      if(Math.abs(next-translateCss)>.05){
+        translateCss=next;
+        nav.style.transform='translate3d(0,'+translateCss+'px,0)';
+      }
     }
 
     function markActive(id){
       links.forEach(function(a){
         var active=a.getAttribute('href')==='#'+id;
         a.classList.toggle('scroll-active',active);
-        if(active){
-          a.setAttribute('aria-current','page');
-          if(nav.scrollHeight>nav.clientHeight){
-            var top=a.offsetTop;
-            var bottom=top+a.offsetHeight;
-            if(top<nav.scrollTop+8) nav.scrollTop=Math.max(0,top-12);
-            else if(bottom>nav.scrollTop+nav.clientHeight-8) nav.scrollTop=bottom-nav.clientHeight+12;
-          }
-        }else{
-          a.removeAttribute('aria-current');
-        }
+        if(active) a.setAttribute('aria-current','page');
+        else a.removeAttribute('aria-current');
       });
     }
 
     function activeSection(){
-      if(!sections.length) return;
       var header=document.querySelector('.topbar');
       var headerBottom=header ? header.getBoundingClientRect().bottom : 0;
-      var marker=headerBottom+Math.min(170,Math.max(90,window.innerHeight*0.20));
+      var marker=headerBottom+Math.min(170,Math.max(90,window.innerHeight*.20));
       var chosen=sections[0];
-
       for(var i=0;i<sections.length;i++){
-        var r=sections[i].getBoundingClientRect();
-        if(r.top<=marker) chosen=sections[i];
+        if(sections[i].getBoundingClientRect().top<=marker) chosen=sections[i];
         else break;
       }
-
       if(window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-18){
         chosen=sections[sections.length-1];
       }
@@ -546,6 +590,7 @@ html,body{overflow-x:hidden}
         var max=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
         if(bar) bar.style.width=Math.min(100,Math.max(0,window.scrollY/max*100))+'%';
         if(back) back.classList.toggle('is-visible',window.scrollY>650);
+        followGuide();
         activeSection();
       });
     }
@@ -557,29 +602,27 @@ html,body{overflow-x:hidden}
       });
     });
 
+    function reset(){
+      nav.style.transform='none';
+      translateCss=0;
+      update();
+    }
     window.addEventListener('scroll',update,{passive:true});
-    window.addEventListener('resize',alignGuide,{passive:true});
-    window.addEventListener('resize',update,{passive:true});
-    window.addEventListener('orientationchange',alignGuide,{passive:true});
+    window.addEventListener('resize',reset,{passive:true});
+    window.addEventListener('orientationchange',reset,{passive:true});
 
-    alignGuide();
-    activeSection();
     update();
-    [120,350,900,1800].forEach(function(ms){setTimeout(function(){alignGuide();activeSection()},ms)});
+    [120,350,900,1800].forEach(function(ms){setTimeout(update,ms)});
 
     cleanup=function(){
       window.removeEventListener('scroll',update);
-      window.removeEventListener('resize',alignGuide);
-      window.removeEventListener('resize',update);
-      window.removeEventListener('orientationchange',alignGuide);
+      window.removeEventListener('resize',reset);
+      window.removeEventListener('orientationchange',reset);
     };
   }
 
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)},{once:true});
-  }else{
-    setTimeout(boot,0);
-  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)},{once:true});
+  else setTimeout(boot,0);
 })();
 </script>
 
