@@ -427,7 +427,7 @@ html,body{overflow-x:hidden}
 </style>
 
 <style id="imdefild-field-guide-geometry-restore">
-/* Preserve the original Field Guide geometry; JS only moves it vertically. */
+/* Stable Field Guide: original geometry, no per-frame transforms. */
 @media (min-width:761px){
   .chapter-layout .guide-nav{
     position:relative!important;
@@ -444,8 +444,22 @@ html,body{overflow-x:hidden}
     overscroll-behavior:auto!important;
     scrollbar-width:auto!important;
     z-index:55!important;
-    will-change:transform;
+    transform:none!important;
+    will-change:auto!important;
   }
+  .chapter-layout .guide-nav.field-guide-fixed{
+    position:fixed!important;
+    top:var(--fg-top)!important;
+    left:var(--fg-left)!important;
+    width:var(--fg-width)!important;
+    max-height:var(--fg-max-height)!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    scrollbar-width:none!important;
+    transform:none!important;
+    margin:0!important;
+  }
+  .chapter-layout .guide-nav.field-guide-fixed::-webkit-scrollbar{display:none!important}
   .chapter-layout main{grid-column:2!important;min-width:0!important}
   .chapter-layout .guide-nav nav a.scroll-active,
   .chapter-layout .guide-nav nav a[aria-current="page"]{
@@ -471,19 +485,26 @@ html,body{overflow-x:hidden}
   .chapter-layout .guide-nav nav a[aria-current="page"] span{color:#d7b66f!important}
 }
 @media (max-width:760px){
-  .chapter-layout .guide-nav{transform:none!important}
+  .chapter-layout .guide-nav,
+  .chapter-layout .guide-nav.field-guide-fixed{
+    position:static!important;
+    inset:auto!important;
+    width:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    transform:none!important;
+  }
 }
 </style>
 
 </head><body><div id="root"></div>
 <script id="imdefild-polish-runtime">
 (function(){
-  var tries=0, cleanup=null, translateCss=0;
+  var tries=0, cleanup=null;
 
   function boot(){
     var layout=document.querySelector('.chapter-layout');
     var nav=layout && layout.querySelector('.guide-nav');
-    var main=layout && layout.querySelector('main');
     var links=nav ? Array.from(nav.querySelectorAll('a[href^="#"]')) : [];
     var sections=links.map(function(a){
       var href=a.getAttribute('href')||'';
@@ -491,17 +512,11 @@ html,body{overflow-x:hidden}
       try{return document.querySelector(href)}catch(e){return null}
     }).filter(Boolean);
 
-    if(!layout || !nav || !main || links.length<2 || sections.length<2){
-      tries++;
-      if(tries<120) setTimeout(boot,100);
+    if(!layout || !nav || links.length<2 || sections.length<2){
+      if(++tries<120) setTimeout(boot,100);
       return;
     }
     if(cleanup) cleanup();
-
-    /* Remove geometry left behind by older fixed-sidebar versions. */
-    ['left','top','width','max-height','position','overflow-y'].forEach(function(p){nav.style.removeProperty(p)});
-    nav.style.transform='none';
-    translateCss=0;
 
     var progress=document.getElementById('site-scroll-progress');
     if(!progress){
@@ -524,38 +539,70 @@ html,body{overflow-x:hidden}
       back.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
     }
 
+    var naturalTop=0;
+    var lockAt=0;
+    var isFixed=false;
+
     function desktop(){return window.matchMedia('(min-width:761px)').matches}
     function zoomValue(){
       var z=parseFloat(getComputedStyle(document.body).zoom);
       return Number.isFinite(z)&&z>0 ? z : 1;
     }
 
-    function followGuide(){
-      if(!desktop()){
-        translateCss=0;
-        nav.style.transform='none';
-        return;
-      }
-      var z=zoomValue();
-      var rect=nav.getBoundingClientRect();
-      /* Remove our existing transform from the measured viewport position. */
-      var baseTop=rect.top-(translateCss*z);
+    function desiredTopPhysical(){
       var header=document.querySelector('.topbar');
       var headerBottom=header ? header.getBoundingClientRect().bottom : 0;
-      /* Matches the original desktop sticky offset while respecting the fixed header. */
-      var desiredTop=Math.max(88*z,headerBottom+18);
-      var next=Math.max(0,(desiredTop-baseTop)/z);
+      return Math.max(79,headerBottom+18);
+    }
 
-      /* Do not let the rail move beyond the bottom of the guide layout. */
-      var layoutRect=layout.getBoundingClientRect();
-      var navHeight=rect.height;
-      var maxPhysical=(layoutRect.bottom-baseTop)-navHeight-18;
-      if(Number.isFinite(maxPhysical)) next=Math.min(next,Math.max(0,maxPhysical/z));
+    function unlock(){
+      isFixed=false;
+      nav.classList.remove('field-guide-fixed');
+      nav.style.removeProperty('--fg-top');
+      nav.style.removeProperty('--fg-left');
+      nav.style.removeProperty('--fg-width');
+      nav.style.removeProperty('--fg-max-height');
+    }
 
-      if(Math.abs(next-translateCss)>.05){
-        translateCss=next;
-        nav.style.transform='translate3d(0,'+translateCss+'px,0)';
+    function measure(){
+      unlock();
+      if(!desktop()) return;
+      /* Wait until the nav is back in its natural grid position before measuring. */
+      var z=zoomValue();
+      var r=nav.getBoundingClientRect();
+      naturalTop=window.scrollY+r.top;
+      var desired=desiredTopPhysical();
+      lockAt=Math.max(0,naturalTop-desired);
+      nav.dataset.fgLeftCss=String(r.left/z);
+      nav.dataset.fgWidthCss=String(r.width/z);
+    }
+
+    function lock(){
+      if(isFixed || !desktop()) return;
+      var z=zoomValue();
+      var desired=desiredTopPhysical();
+      var left=parseFloat(nav.dataset.fgLeftCss||'0');
+      var width=parseFloat(nav.dataset.fgWidthCss||'0');
+      if(!Number.isFinite(left) || !Number.isFinite(width) || width<=0){
+        var r=nav.getBoundingClientRect();
+        left=r.left/z; width=r.width/z;
       }
+      nav.style.setProperty('--fg-top',(desired/z)+'px');
+      nav.style.setProperty('--fg-left',left+'px');
+      nav.style.setProperty('--fg-width',width+'px');
+      nav.style.setProperty('--fg-max-height',Math.max(260,(window.innerHeight-desired-18)/z)+'px');
+      nav.classList.add('field-guide-fixed');
+      isFixed=true;
+    }
+
+    function updateFixedState(){
+      if(!desktop()){
+        if(isFixed) unlock();
+        return;
+      }
+      /* Small hysteresis prevents flickering exactly at the lock point. */
+      if(!isFixed && window.scrollY>=lockAt+2) lock();
+      else if(isFixed && window.scrollY<=lockAt-2) unlock();
     }
 
     function markActive(id){
@@ -590,8 +637,16 @@ html,body{overflow-x:hidden}
         var max=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
         if(bar) bar.style.width=Math.min(100,Math.max(0,window.scrollY/max*100))+'%';
         if(back) back.classList.toggle('is-visible',window.scrollY>650);
-        followGuide();
+        updateFixedState();
         activeSection();
+      });
+    }
+
+    function remeasure(){
+      unlock();
+      requestAnimationFrame(function(){
+        measure();
+        update();
       });
     }
 
@@ -602,22 +657,18 @@ html,body{overflow-x:hidden}
       });
     });
 
-    function reset(){
-      nav.style.transform='none';
-      translateCss=0;
-      update();
-    }
     window.addEventListener('scroll',update,{passive:true});
-    window.addEventListener('resize',reset,{passive:true});
-    window.addEventListener('orientationchange',reset,{passive:true});
+    window.addEventListener('resize',remeasure,{passive:true});
+    window.addEventListener('orientationchange',remeasure,{passive:true});
 
+    measure();
     update();
-    [120,350,900,1800].forEach(function(ms){setTimeout(update,ms)});
+    [150,450,1000].forEach(function(ms){setTimeout(remeasure,ms)});
 
     cleanup=function(){
       window.removeEventListener('scroll',update);
-      window.removeEventListener('resize',reset);
-      window.removeEventListener('orientationchange',reset);
+      window.removeEventListener('resize',remeasure);
+      window.removeEventListener('orientationchange',remeasure);
     };
   }
 
