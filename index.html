@@ -316,8 +316,76 @@ body>[data-radix-popper-content-wrapper]{z-index:250!important}
 #fusion .chapter-subsection .guide-table th:nth-child(2),#fusion .chapter-subsection .guide-table td:nth-child(2){color:#86dc84}
 #fusion .chapter-subsection .guide-table th:nth-child(3),#fusion .chapter-subsection .guide-table td:nth-child(3){color:#79b8ff}
 #fusion .chapter-subsection .guide-table th:nth-child(4),#fusion .chapter-subsection .guide-table td:nth-child(4){color:#ce98ff}
-@media (min-width:761px){body{zoom:.9;width:111.111111%}}
+@media (min-width:761px){body{zoom:.9}}
 @media (max-width:760px){.rarity-key{grid-template-columns:1fr}.rarity-key-item{padding:12px 14px 12px 17px}}
+
+/* Responsive containment: keep the 90% desktop density without page-level horizontal overflow */
+html,body,#root{max-width:100%;overflow-x:clip}
+*,*::before,*::after{box-sizing:border-box}
+img,svg,video,canvas{max-width:100%}
+.layout,main,main>section,.guide-nav,.chapter-subsection,.guide-details,.details-body{min-width:0;max-width:100%}
+.table-frame{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+.table-frame .guide-table{margin-left:0;margin-right:0}
+.controls,.role-tabs,.swap-calculator,.rarity-key,.upgrade-note-grid{max-width:100%}
+
+@media (min-width:761px){
+  body{width:auto!important;min-width:0!important}
+}
+
+@media (max-width:760px){
+  html,body,#root{width:100%;max-width:100%;overflow-x:hidden}
+  body{zoom:1!important}
+  header{max-width:100%;overflow:hidden}
+  .layout{width:100%;max-width:100%;padding:16px 14px 28px!important}
+  .guide-nav{width:100%;max-width:100%;overflow:hidden;margin-bottom:16px}
+  .guide-nav nav{width:100%;max-width:100%;overflow-x:auto!important;overflow-y:hidden;scrollbar-width:thin;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+  .guide-nav nav a{flex:0 0 auto}
+  main{width:100%;max-width:100%}
+  main>section,main>section.intro{width:100%;max-width:100%;padding:21px 16px!important;border-radius:14px}
+  h1{font-size:clamp(31px,9vw,39px)!important;line-height:1.02;overflow-wrap:anywhere}
+  h2{font-size:clamp(25px,7.2vw,30px)!important;line-height:1.08}
+  h3{overflow-wrap:anywhere}
+  p,li,figcaption,.note,.build-help{overflow-wrap:anywhere}
+  .quickfacts{display:grid!important;grid-template-columns:1fr!important;gap:12px!important;padding:16px 0!important}
+  .quickfacts div{width:100%;min-width:0}
+  .twocol,.lesson-grid,.bis-grid,.core-reference-grid,.npc-reference,.damage-cards,.damage-inputs,.cut-fees,.upgrade-note-grid{grid-template-columns:1fr!important}
+  .core-icons,.paired-gems,.breakpoints{flex-wrap:wrap}
+  .core-icons figure,.paired-gems figure{min-width:0}
+  .bis-gems{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .rarity-key{grid-template-columns:1fr!important}
+  .controls{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}
+  .controls label,.controls [data-slot="select-trigger"]{width:100%!important;min-width:0!important;max-width:100%!important}
+  .role-tabs [role="tablist"]{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%!important;max-width:100%!important}
+  .role-tabs [role="tab"]{min-width:0!important;width:100%;white-space:normal;text-align:center;line-height:1.25}
+  .table-frame{margin-inline:0;width:100%;max-width:100%;overflow-x:auto!important;border-radius:10px}
+  .guide-table{min-width:560px!important;width:max-content;max-width:none;font-size:12px!important}
+  .guide-table th,.guide-table td{padding:11px 12px!important}
+  .swap-calculator{padding:18px 14px!important}
+  .swap-presets{display:grid!important;grid-template-columns:1fr!important;width:100%}
+  .swap-presets button{width:100%;white-space:normal}
+  .swap-result{align-items:flex-start}
+  .upgrade-note-copy,.upgrade-note-image,.core-reference,.gem-type-card,.bis-card,.lesson-grid>div{min-width:0}
+  .npc-reference figure{align-items:flex-start;gap:14px;padding:15px}
+  .npc-reference img{flex:0 0 auto;width:72px!important;height:auto!important;max-height:108px}
+  .gallery-image{height:auto!important;min-height:0!important}
+  .gallery-image img{width:100%!important;height:auto!important;object-fit:contain}
+  .gamefigure{max-width:100%;overflow:hidden}
+  .gamefigure img{width:100%;height:auto;object-fit:contain}
+  .note{padding:16px!important}
+  .short-steps{padding-left:22px}
+  .chapter-subsection{margin-top:22px;padding-top:18px}
+  footer{padding-inline:14px}
+}
+
+@media (max-width:420px){
+  .layout{padding-left:10px!important;padding-right:10px!important}
+  main>section,main>section.intro{padding:18px 13px!important}
+  .bis-gems{grid-template-columns:1fr 1fr!important;gap:6px!important}
+  .bis-gems>div{padding-inline:4px!important}
+  .role-tabs [role="tab"]{font-size:12px!important;padding:10px 7px!important}
+  .guide-table{min-width:520px!important}
+}
+
 </style>
 </head><body><div id="root"></div>
 <script id="imdefild-polish-runtime">
