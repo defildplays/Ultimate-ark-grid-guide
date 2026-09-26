@@ -319,6 +319,20 @@ body>[data-radix-popper-content-wrapper]{z-index:250!important}
 @media (min-width:761px){body{zoom:.9}}
 html,body{overflow-x:hidden}
 @media (max-width:760px){.rarity-key{grid-template-columns:1fr}.rarity-key-item{padding:12px 14px 12px 17px}}
+
+/* Keep the original header visible while the desktop page uses 90% CSS zoom. */
+.topbar{
+  position:fixed!important;
+  top:0!important;
+  left:0!important;
+  right:0!important;
+  width:auto!important;
+  z-index:75!important;
+  box-sizing:border-box!important;
+}
+#root{padding-top:68px}
+@media (max-width:760px){#root{padding-top:64px}}
+
 </style>
 </head><body><div id="root"></div>
 <script id="imdefild-polish-runtime">
