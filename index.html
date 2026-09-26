@@ -372,14 +372,87 @@ html,body{overflow-x:hidden}
     max-height:none!important;
   }
 }
+
+
+/* ================================================================
+   Field Guide — always-visible desktop rail + reliable scrollspy
+   ================================================================ */
+@media (min-width:761px){
+  .chapter-layout main{
+    grid-column:2!important;
+    min-width:0!important;
+  }
+  .chapter-layout .guide-nav{
+    position:fixed!important;
+    top:92px!important;
+    left:3.5vw!important;
+    width:218px!important;
+    max-height:calc(100vh - 112px)!important;
+    margin:0!important;
+    align-self:auto!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    scrollbar-width:none!important;
+    z-index:55!important;
+  }
+  .chapter-layout .guide-nav::-webkit-scrollbar{display:none!important}
+  .chapter-layout .guide-nav nav a.scroll-active,
+  .chapter-layout .guide-nav nav a[aria-current="page"]{
+    color:#f5cf80!important;
+    background:linear-gradient(90deg,rgba(133,102,54,.28),rgba(42,52,67,.72))!important;
+    border-color:#665437!important;
+    box-shadow:inset 3px 0 0 #e2b45b!important;
+  }
+  .chapter-layout .guide-nav nav a.scroll-active span,
+  .chapter-layout .guide-nav nav a[aria-current="page"] span{
+    color:#d8b76f!important;
+  }
+}
+@media (min-width:761px) and (max-width:1050px){
+  .chapter-layout .guide-nav{
+    left:2.5vw!important;
+    width:190px!important;
+  }
+}
+@media (max-width:760px){
+  .chapter-layout main{grid-column:auto!important}
+  .chapter-layout .guide-nav{
+    position:static!important;
+    inset:auto!important;
+    width:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+}
 </style>
 </head><body><div id="root"></div>
 <script id="imdefild-polish-runtime">
 (function(){
-  function init(){
-    var existing=document.getElementById('site-scroll-progress');
-    var progress=existing || document.createElement('div');
-    if(!existing){
+  var tries=0;
+  var cleanup=null;
+
+  function boot(){
+    var layout=document.querySelector('.chapter-layout');
+    var nav=layout && layout.querySelector('.guide-nav');
+    var main=layout && layout.querySelector('main');
+    var links=nav ? Array.from(nav.querySelectorAll('a[href^="#"]')) : [];
+    var sections=links.map(function(a){
+      var href=a.getAttribute('href') || '';
+      if(!href || href.charAt(0)!=='#') return null;
+      try{return document.querySelector(href)}catch(e){return null}
+    }).filter(Boolean);
+
+    if(!layout || !nav || !main || links.length<2 || sections.length<2){
+      tries++;
+      if(tries<120) setTimeout(boot,100);
+      return;
+    }
+
+    if(cleanup) cleanup();
+
+    var progress=document.getElementById('site-scroll-progress');
+    if(!progress){
+      progress=document.createElement('div');
       progress.id='site-scroll-progress';
       progress.setAttribute('aria-hidden','true');
       progress.innerHTML='<i></i>';
@@ -398,101 +471,115 @@ html,body{overflow-x:hidden}
       back.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
     }
 
-    var layout=document.querySelector('.chapter-layout');
-    var nav=layout && layout.querySelector('.guide-nav');
-    var navLinks=nav ? Array.from(nav.querySelectorAll('a[href^="#"]')) : [];
-    var sections=navLinks.map(function(a){
-      try{return document.querySelector(a.getAttribute('href'))}catch(e){return null}
-    }).filter(Boolean);
-
-    function bodyZoom(){
+    function desktop(){return window.matchMedia('(min-width:761px)').matches}
+    function zoomValue(){
       var z=parseFloat(getComputedStyle(document.body).zoom);
       return Number.isFinite(z) && z>0 ? z : 1;
     }
 
-    function setActive(id){
-      navLinks.forEach(function(a){
-        var active=a.getAttribute('href')==='#'+id;
-        if(active){
-          a.setAttribute('aria-current','page');
-          if(nav && nav.scrollHeight>nav.clientHeight){
-            var top=a.offsetTop;
-            var bottom=top+a.offsetHeight;
-            if(top<nav.scrollTop+8) nav.scrollTo({top:Math.max(0,top-10),behavior:'smooth'});
-            else if(bottom>nav.scrollTop+nav.clientHeight-8) nav.scrollTo({top:bottom-nav.clientHeight+10,behavior:'smooth'});
-          }
-        }else a.removeAttribute('aria-current');
-      });
-    }
-
-    function updateActiveSection(){
-      if(!sections.length) return;
-      var header=document.querySelector('.topbar');
-      var headerBottom=header ? header.getBoundingClientRect().bottom : 0;
-      var probe=headerBottom+Math.min(150,window.innerHeight*.22);
-      var active=sections[0];
-      for(var i=0;i<sections.length;i++){
-        var rect=sections[i].getBoundingClientRect();
-        if(rect.top<=probe) active=sections[i];
-        else break;
-      }
-      if(window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-12){
-        active=sections[sections.length-1];
-      }
-      setActive(active.id);
-    }
-
-    function positionFieldGuide(){
-      if(!layout || !nav) return;
-      var desktop=window.matchMedia('(min-width:761px)').matches;
-      if(!desktop){
-        nav.classList.remove('field-guide-following');
-        nav.style.removeProperty('top');
+    function alignGuide(){
+      if(!desktop()){
         nav.style.removeProperty('left');
+        nav.style.removeProperty('top');
         nav.style.removeProperty('width');
         nav.style.removeProperty('max-height');
         return;
       }
-      var zoom=bodyZoom();
-      var layoutRect=layout.getBoundingClientRect();
-      var columns=getComputedStyle(layout).gridTemplateColumns.trim().split(/\s+/);
-      var firstCol=parseFloat(columns[0]);
-      if(!Number.isFinite(firstCol) || firstCol<=0) firstCol=nav.offsetWidth || 210;
+      var z=zoomValue();
+      var rect=layout.getBoundingClientRect();
+      var cs=getComputedStyle(layout);
+      var cols=cs.gridTemplateColumns.trim().split(/\s+/);
+      var first=parseFloat(cols[0]);
+      if(!Number.isFinite(first) || first<=0) first=nav.offsetWidth || 218;
       var header=document.querySelector('.topbar');
       var headerBottom=header ? header.getBoundingClientRect().bottom : 0;
-      var desiredTopPhysical=headerBottom+24;
-      nav.classList.add('field-guide-following');
-      nav.style.top=(desiredTopPhysical/zoom)+'px';
-      nav.style.left=(layoutRect.left/zoom)+'px';
-      nav.style.width=firstCol+'px';
-      nav.style.maxHeight=(Math.max(260,window.innerHeight-desiredTopPhysical-22)/zoom)+'px';
+      var topPhysical=Math.max(headerBottom+22,82);
+
+      nav.style.setProperty('left',(rect.left/z)+'px','important');
+      nav.style.setProperty('top',(topPhysical/z)+'px','important');
+      nav.style.setProperty('width',first+'px','important');
+      nav.style.setProperty('max-height',(Math.max(300,window.innerHeight-topPhysical-20)/z)+'px','important');
     }
 
-    function updateScroll(){
-      var max=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
-      var pct=Math.min(100,Math.max(0,window.scrollY/max*100));
-      if(bar) bar.style.width=pct+'%';
-      back.classList.toggle('is-visible',window.scrollY>650);
-      updateActiveSection();
+    function markActive(id){
+      links.forEach(function(a){
+        var active=a.getAttribute('href')==='#'+id;
+        a.classList.toggle('scroll-active',active);
+        if(active){
+          a.setAttribute('aria-current','page');
+          if(nav.scrollHeight>nav.clientHeight){
+            var top=a.offsetTop;
+            var bottom=top+a.offsetHeight;
+            if(top<nav.scrollTop+8) nav.scrollTop=Math.max(0,top-12);
+            else if(bottom>nav.scrollTop+nav.clientHeight-8) nav.scrollTop=bottom-nav.clientHeight+12;
+          }
+        }else{
+          a.removeAttribute('aria-current');
+        }
+      });
     }
 
-    navLinks.forEach(function(a){
+    function activeSection(){
+      if(!sections.length) return;
+      var header=document.querySelector('.topbar');
+      var headerBottom=header ? header.getBoundingClientRect().bottom : 0;
+      var marker=headerBottom+Math.min(170,Math.max(90,window.innerHeight*0.20));
+      var chosen=sections[0];
+
+      for(var i=0;i<sections.length;i++){
+        var r=sections[i].getBoundingClientRect();
+        if(r.top<=marker) chosen=sections[i];
+        else break;
+      }
+
+      if(window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-18){
+        chosen=sections[sections.length-1];
+      }
+      markActive(chosen.id);
+    }
+
+    var raf=0;
+    function update(){
+      if(raf) return;
+      raf=requestAnimationFrame(function(){
+        raf=0;
+        var max=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
+        if(bar) bar.style.width=Math.min(100,Math.max(0,window.scrollY/max*100))+'%';
+        if(back) back.classList.toggle('is-visible',window.scrollY>650);
+        activeSection();
+      });
+    }
+
+    links.forEach(function(a){
       a.addEventListener('click',function(){
         var id=(a.getAttribute('href')||'').slice(1);
-        if(id) setActive(id);
+        if(id) markActive(id);
       });
     });
 
-    positionFieldGuide();
-    updateScroll();
-    window.addEventListener('scroll',updateScroll,{passive:true});
-    window.addEventListener('resize',function(){positionFieldGuide();updateScroll()});
-    window.addEventListener('load',function(){positionFieldGuide();updateScroll()},{once:true});
-    setTimeout(function(){positionFieldGuide();updateScroll()},160);
-    setTimeout(function(){positionFieldGuide();updateScroll()},700);
+    window.addEventListener('scroll',update,{passive:true});
+    window.addEventListener('resize',alignGuide,{passive:true});
+    window.addEventListener('resize',update,{passive:true});
+    window.addEventListener('orientationchange',alignGuide,{passive:true});
+
+    alignGuide();
+    activeSection();
+    update();
+    [120,350,900,1800].forEach(function(ms){setTimeout(function(){alignGuide();activeSection()},ms)});
+
+    cleanup=function(){
+      window.removeEventListener('scroll',update);
+      window.removeEventListener('resize',alignGuide);
+      window.removeEventListener('resize',update);
+      window.removeEventListener('orientationchange',alignGuide);
+    };
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true});
-  else init();
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)},{once:true});
+  }else{
+    setTimeout(boot,0);
+  }
 })();
 </script>
 
